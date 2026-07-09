@@ -1,4 +1,4 @@
-# nsum — 3SUM, four ways
+# nsum: 3SUM, four ways
 
 Find/count triples `a + b + c == target` in an integer array, benchmarked across
 four algorithms. Built to answer one question: *which approach wins, and when?*
@@ -11,7 +11,7 @@ four algorithms. Built to answer one question: *which approach wins, and when?*
 | Hash map | O(n²) | count | you want no sort; simple |
 | **Two-pointer** | O(n²) | count | **default** for general integers |
 | FFT (decision) | O(U log U) | decide + witness | bounded range, "is target reachable?" |
-| FFT (counting) | O(U log U) | **exact count** | bounded range + huge `n` — beats two-pointer |
+| FFT (counting) | O(U log U) | **exact count** | bounded range + huge `n`, beats two-pointer |
 
 There is **no** sub-quadratic general 3SUM (3SUM conjecture). FFT is the only escape,
 and only for **bounded integer ranges**. It is not decision-only: with count histograms +
@@ -21,7 +21,7 @@ inclusion-exclusion it counts every triple exactly in O(U log U) (see `fft_count
 
 ```
 Need a count or all triples?  ── yes ──►  two-pointer   (or hash if you can't sort)
-        │ no — just yes/no
+        │ no, just yes/no
         ▼
 Values dense & small range  AND  n huge (≳1M)?  ── yes ──►  FFT
         │ no
@@ -29,12 +29,12 @@ Values dense & small range  AND  n huge (≳1M)?  ── yes ──►  FFT
         two-pointer
 ```
 
-- **Two-pointer (O(n²)) — default.** Counting or listing, any integers, n up to ~100K.
+- **Two-pointer (O(n²)): default.** Counting or listing, any integers, n up to ~100K.
   Fastest counter measured (~2.8× over hash). Needs a sort (free in the noise). Use this
   unless a specific reason says otherwise.
-- **Hash map (O(n²)) — niche.** Only when you can't sort (must keep original order/indices)
+- **Hash map (O(n²)): niche.** Only when you can't sort (must keep original order/indices)
   or want the simplest no-sort code. Same complexity, ~2.8× slower (cache misses + probing).
-- **FFT (O(U log U)) — escape hatch.** Use when **both** hold: (1) values in a small bounded
+- **FFT (O(U log U)): escape hatch.** Use when **both** hold: (1) values in a small bounded
   range so `U log U ≪ n²`; (2) `n` large, where O(n²) hurts. Works for **decision** (`nsum_fft.c`)
   *and* **exact counting** (`fft_count.c`). Miss either condition → don't.
 
@@ -43,12 +43,12 @@ One line: **two-pointer for general integers; FFT when values are bounded and n 
 
 ## Files
 
-- `nsum.c` — two-pointer 3SUM to a target. Prints distinct value-triples. Self-test via `./nsum`.
-- `nsum_simd.c` — NEON reference version (O(n³) membership scan). Superseded by `nsum.c`; kept to show the intrinsics.
-- `nsum_fft.c` — FFT decision: "is target reachable as a+b+c?" + one witness. Bounded-range only.
-- `fft_count.c` — FFT **exact counter** (O(U log U)): counts all index-triples via convolution + inclusion-exclusion. Bounded-range only; beats two-pointer at large n.
-- `bench.c` — benchmark harness. Counts zero-sum index-triples via brute / hash / two-pointer, cross-validates counts, times each.
-- `*ints.txt` — Sedgewick/Wayne **algs4** `ThreeSum` benchmark inputs (1K…32K downloaded; 64K synthetic).
+- `nsum.c`, two-pointer 3SUM to a target. Prints distinct value-triples. Self-test via `./nsum`.
+- `nsum_simd.c`, NEON reference version (O(n³) membership scan). Superseded by `nsum.c`; kept to show the intrinsics.
+- `nsum_fft.c`, FFT decision: "is target reachable as a+b+c?" + one witness. Bounded-range only.
+- `fft_count.c`, FFT **exact counter** (O(U log U)): counts all index-triples via convolution + inclusion-exclusion. Bounded-range only; beats two-pointer at large n.
+- `bench.c`, benchmark harness. Counts zero-sum index-triples via brute / hash / two-pointer, cross-validates counts, times each.
+- `*ints.txt`, Sedgewick/Wayne **algs4** `ThreeSum` benchmark inputs (1K…32K downloaded; 64K synthetic).
 
 ## Build & run
 
@@ -113,7 +113,7 @@ across methods; 1K–32K match algs4's published reference numbers.
 Notes:
 - Brute ×8 per doubling (n³). Dead by 16K.
 - Hash and two-pointer both ×4 per doubling (n²); two-pointer stays ~2.7–3× faster.
-- FFT is flat in `n` — cost tracks value range `U`, not `n`. On these files `U ≈ 2M`
+- FFT is flat in `n`, cost tracks value range `U`, not `n`. On these files `U ≈ 2M`
   (m = 2²²), so ~0.5s regardless of size. Same ~0.5s whether deciding (`nsum_fft.c`) or
   exact-counting (`fft_count.c`).
 
@@ -130,7 +130,7 @@ On the algs4 inputs (range `U ≈ 2M`) it overtakes two-pointer around 20–25K:
 | 64K | 5.539s | 0.45s | **FFT 12×** |
 
 Past the crossover, FFT pulls away forever (n² vs U log U). Correctness note: FFT counting is
-**not** decision-only — index-distinctness is handled by inclusion-exclusion `(S1 − 3A + 2B)/6`.
+**not** decision-only, index-distinctness is handled by inclusion-exclusion `(S1 − 3A + 2B)/6`.
 
 ### The FFT crossover
 
@@ -154,10 +154,10 @@ in one convolution, no pair scanning. FFT's dream case: small range + impossible
 
 ### Where FFT fails
 
-1. **Wide value range** — cost is O(U log U); sparse/large ints blow up `U`. Dies when `U log U > n²`.
-2. **Precision** — double-precision convolution rounds counts; huge counts risk a wrong `llround` (fix: integer NTT). Validated exact up to 64K here.
-3. **Non-additive keys** — needs values → bounded integer index and a *sum* (linear convolution). Strings/floats/similarity → useless.
-4. **Overhead** — power-of-two padding wastes up to 2×; setup constant loses to a trivial loop at small `n`.
+1. **Wide value range**, cost is O(U log U); sparse/large ints blow up `U`. Dies when `U log U > n²`.
+2. **Precision**, double-precision convolution rounds counts; huge counts risk a wrong `llround` (fix: integer NTT). Validated exact up to 64K here.
+3. **Non-additive keys**, needs values → bounded integer index and a *sum* (linear convolution). Strings/floats/similarity → useless.
+4. **Overhead**, power-of-two padding wastes up to 2×; setup constant loses to a trivial loop at small `n`.
 
 ---
 
@@ -172,8 +172,8 @@ summing to `target - a[i]`. Put one pointer at each end of that suffix:
 lo = i+1, hi = n-1
 while lo < hi:
     s = a[lo] + a[hi]
-    if s < target: lo++      # too small — only way up is a bigger low end
-    elif s > target: hi--    # too big — only way down is a smaller high end
+    if s < target: lo++      # too small, only way up is a bigger low end
+    elif s > target: hi--    # too big, only way down is a smaller high end
     else: record; advance both
 ```
 
@@ -188,8 +188,8 @@ Duplicate handling (for counting): when a match is found and `a[lo] != a[hi]`, c
 full block of equal lows × block of equal highs, then skip both blocks. When the whole
 `[lo, hi]` window is one repeated value, the pairs are "choose 2" = `m(m-1)/2`.
 
-Why it beats the hash map (same O(n²)): purely sequential memory access from both ends —
-cache-friendly, no hashing, no probing, no random loads. The hash map pays a cache miss
+Why it beats the hash map (same O(n²)): purely sequential memory access from both ends.
+Cache-friendly, no hashing, no probing, no random loads. The hash map pays a cache miss
 and probe per element. Measured ~2.8× gap.
 
 ## Technical: SIMD (ARM NEON)
@@ -215,6 +215,6 @@ a cubic never beats fixing the exponent. The lesson worth keeping: **pick the al
 then vectorize the inner loop of the right algorithm.** SIMD is a multiplier on the constant,
 never a substitute for complexity class.
 
-(The two-pointer inner loop is inherently sequential — each step's direction depends on the
-previous comparison — so it doesn't vectorize cleanly. The right move there is the better big-O,
+(The two-pointer inner loop is inherently sequential, each step's direction depends on the
+previous comparison, so it doesn't vectorize cleanly. The right move there is the better big-O,
 not lanes.)
