@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
 #include <time.h>
 #include <assert.h>
 
@@ -75,57 +74,32 @@ long three_sum_count_fft(const int32_t *arr, int n, int64_t T) {
     return count;
 }
 
-static int cmp_i32(const void *a, const void *b) {
-    int32_t x = *(const int32_t *)a, y = *(const int32_t *)b;
-    return (x > y) - (x < y);
-}
-// two-pointer reference (same as bench) to validate the FFT count
-static long twoptr(int32_t *a, int n, int64_t T) {
-    qsort(a, n, sizeof *a, cmp_i32);
-    long c = 0;
-    for (int i = 0; i < n - 2; i++) {
-        int64_t tgt = T - a[i]; int lo = i + 1, hi = n - 1;
-        while (lo < hi) {
-            int64_t s = (int64_t)a[lo] + a[hi];
-            if (s < tgt) lo++;
-            else if (s > tgt) hi--;
-            else if (a[lo] != a[hi]) { int cl=1,ch=1; while(a[lo+cl]==a[lo])cl++; while(a[hi-ch]==a[hi])ch++; c+=(long)cl*ch; lo+=cl; hi-=ch; }
-            else { long mm = hi-lo+1; c += mm*(mm-1)/2; break; }
-        }
-    }
-    return c;
-}
-
 static void demo(void) {
     int32_t a[] = {-1, 0, 1, 2, -1, -4};              // 3 index-triples sum to 0
-    int32_t b[6]; memcpy(b, a, sizeof a);
-    assert(three_sum_count_fft(a, 6, 0) == twoptr(b, 6, 0));
-    int32_t c[] = {5, 5, 5};                          // (5,5,5) once
-    int32_t d[3]; memcpy(d, c, sizeof c);
-    assert(three_sum_count_fft(c, 3, 15) == twoptr(d, 3, 15));
+    assert(three_sum_count_fft(a, 6, 0) == 3);
+    int32_t b[] = {5, 5, 5};                          // (5,5,5) once
+    assert(three_sum_count_fft(b, 3, 15) == 1);
+    int32_t c[] = {1, 2, 3};                          // none
+    assert(three_sum_count_fft(c, 3, 100) == 0);
     printf("demo ok\n");
-}
-
-static int read_ints(const char *path, int32_t **out) {
-    FILE *f = fopen(path, "r");
-    if (!f) { perror(path); exit(1); }
-    int cap = 1 << 20, n = 0; int32_t *a = malloc(cap * sizeof *a), v;
-    while (fscanf(f, "%d", &v) == 1) { if (n == cap){cap*=2;a=realloc(a,cap*sizeof *a);} a[n++]=v; }
-    fclose(f); *out = a; return n;
-}
-static double secs(struct timespec a, struct timespec b) {
-    return (b.tv_sec - a.tv_sec) + (b.tv_nsec - a.tv_nsec) / 1e9;
 }
 
 int main(int argc, char **argv) {
     if (argc < 2) { demo(); return 0; }
     int64_t T = argc > 2 ? atoll(argv[2]) : 0;
-    int32_t *a; int n = read_ints(argv[1], &a);
+    // read whitespace-separated ints
+    FILE *f = fopen(argv[1], "r");
+    if (!f) { perror(argv[1]); return 1; }
+    int cap = 1 << 20, n = 0; int32_t *a = malloc(cap * sizeof *a), v;
+    while (fscanf(f, "%d", &v) == 1) { if (n == cap){cap*=2;a=realloc(a,cap*sizeof *a);} a[n++]=v; }
+    fclose(f);
+
     struct timespec t0, t1;
     clock_gettime(CLOCK_MONOTONIC, &t0);
     long c = three_sum_count_fft(a, n, T);
     clock_gettime(CLOCK_MONOTONIC, &t1);
-    printf("%-12s n=%-7d T=%-6lld  fft-count=%-10ld %.4fs\n", argv[1], n, (long long)T, c, secs(t0, t1));
+    double s = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9;
+    printf("%-12s n=%-7d T=%-6lld  fft-count=%-10ld %.4fs\n", argv[1], n, (long long)T, c, s);
     free(a);
     return 0;
 }

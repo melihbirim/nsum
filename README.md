@@ -98,7 +98,7 @@ across methods; 1K–32K match algs4's published reference numbers.
 
 **Times (seconds), Apple arm64, -O3**
 
-| n | brute O(n³) | hash O(n²) | two-pointer O(n²) | FFT decision |
+| n | brute O(n³) | hash O(n²) | two-pointer O(n²) | FFT O(U log U) |
 |---|---|---|---|---|
 | 1K | 0.035 | 0.003 | 0.0013 | 0.45 |
 | 2K | 0.267 | 0.013 | 0.005 | 0.53 |
@@ -113,8 +113,9 @@ across methods; 1K–32K match algs4's published reference numbers.
 Notes:
 - Brute ×8 per doubling (n³). Dead by 16K.
 - Hash and two-pointer both ×4 per doubling (n²); two-pointer stays ~2.7–3× faster.
-- FFT is flat in `n` — its cost tracks value range `U`, not `n`. On these files `U ≈ 2M`
-  (m = 2²²), so ~0.5s regardless of size.
+- FFT is flat in `n` — cost tracks value range `U`, not `n`. On these files `U ≈ 2M`
+  (m = 2²²), so ~0.5s regardless of size. Same ~0.5s whether deciding (`nsum_fft.c`) or
+  exact-counting (`fft_count.c`).
 
 ### FFT counting vs two-pointer
 
