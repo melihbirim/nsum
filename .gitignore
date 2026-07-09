@@ -1,0 +1,11 @@
+# compiled binaries
+nsum
+nsum_simd
+nsum_fft
+bench
+*.o
+
+# large / generated benchmark inputs (regenerate locally)
+10Mints.txt
+64Kints.txt
+16Kseq.txt
