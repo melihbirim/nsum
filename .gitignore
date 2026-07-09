@@ -2,6 +2,7 @@
 nsum
 nsum_simd
 nsum_fft
+fft_count
 bench
 *.o
 
@@ -9,3 +10,6 @@ bench
 10Mints.txt
 64Kints.txt
 16Kseq.txt
+
+# academic paper — do not publish
+*.pdf

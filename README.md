@@ -9,11 +9,13 @@ four algorithms. Built to answer one question: *which approach wins, and when?*
 |---|---|---|---|
 | Brute force | O(n³) | count | never (reference/validation only) |
 | Hash map | O(n²) | count | you want no sort; simple |
-| **Two-pointer** | O(n²) | count | **default** — fastest counter in practice |
-| FFT | O(U log U) | decide + witness | huge `n`, small value range `U`, decision only |
+| **Two-pointer** | O(n²) | count | **default** for general integers |
+| FFT (decision) | O(U log U) | decide + witness | bounded range, "is target reachable?" |
+| FFT (counting) | O(U log U) | **exact count** | bounded range + huge `n` — beats two-pointer |
 
 There is **no** sub-quadratic general 3SUM (3SUM conjecture). FFT is the only escape,
-and only for bounded integer ranges answering a *decision* question — not counting.
+and only for **bounded integer ranges**. It is not decision-only: with count histograms +
+inclusion-exclusion it counts every triple exactly in O(U log U) (see `fft_count.c`).
 
 ## Which one do I use?
 
@@ -32,18 +34,19 @@ Values dense & small range  AND  n huge (≳1M)?  ── yes ──►  FFT
   unless a specific reason says otherwise.
 - **Hash map (O(n²)) — niche.** Only when you can't sort (must keep original order/indices)
   or want the simplest no-sort code. Same complexity, ~2.8× slower (cache misses + probing).
-- **FFT (O(U log U)) — escape hatch.** Use *only* when **all three** hold: (1) decision, not
-  counting; (2) values in a small bounded range so `U log U ≪ n²`; (3) `n` huge, where O(n²)
-  is hours. Miss any one → don't.
+- **FFT (O(U log U)) — escape hatch.** Use when **both** hold: (1) values in a small bounded
+  range so `U log U ≪ n²`; (2) `n` large, where O(n²) hurts. Works for **decision** (`nsum_fft.c`)
+  *and* **exact counting** (`fft_count.c`). Miss either condition → don't.
 
-One line: **two-pointer always, unless n is massive + values bounded + you only need yes/no →
-then FFT. Hash only when you can't sort.**
+One line: **two-pointer for general integers; FFT when values are bounded and n is large
+(it both decides and counts). Hash only when you can't sort.**
 
 ## Files
 
 - `nsum.c` — two-pointer 3SUM to a target. Prints distinct value-triples. Self-test via `./nsum`.
 - `nsum_simd.c` — NEON reference version (O(n³) membership scan). Superseded by `nsum.c`; kept to show the intrinsics.
 - `nsum_fft.c` — FFT decision: "is target reachable as a+b+c?" + one witness. Bounded-range only.
+- `fft_count.c` — FFT **exact counter** (O(U log U)): counts all index-triples via convolution + inclusion-exclusion. Bounded-range only; beats two-pointer at large n.
 - `bench.c` — benchmark harness. Counts zero-sum index-triples via brute / hash / two-pointer, cross-validates counts, times each.
 - `*ints.txt` — Sedgewick/Wayne **algs4** `ThreeSum` benchmark inputs (1K…32K downloaded; 64K synthetic).
 
@@ -61,6 +64,8 @@ cc -O3 -o nsum_simd nsum_simd.c && ./nsum_simd   # NEON reference version
 ./bench 4Kints.txt --brute      # add O(n³) reference
 ./bench 16Kseq.txt 1000000      # custom target
 ./nsum_fft 0 8Kints.txt         # FFT decision on a file
+cc -O3 -o fft_count fft_count.c -lm
+./fft_count 64Kints.txt 0       # FFT exact count, O(U log U)
 ```
 
 Large inputs are gitignored (regenerate locally):
@@ -111,6 +116,21 @@ Notes:
 - FFT is flat in `n` — its cost tracks value range `U`, not `n`. On these files `U ≈ 2M`
   (m = 2²²), so ~0.5s regardless of size.
 
+### FFT counting vs two-pointer
+
+`fft_count.c` counts triples **exactly** (all seven counts above reproduced), flat ~0.5s.
+On the algs4 inputs (range `U ≈ 2M`) it overtakes two-pointer around 20–25K:
+
+| n | two-pointer | FFT-count | winner |
+|---|---|---|---|
+| 8K | 0.083s | 0.52s | two-pointer |
+| 16K | 0.337s | 0.53s | two-pointer |
+| 32K | 1.367s | 0.49s | **FFT 2.8×** |
+| 64K | 5.539s | 0.45s | **FFT 12×** |
+
+Past the crossover, FFT pulls away forever (n² vs U log U). Correctness note: FFT counting is
+**not** decision-only — index-distinctness is handled by inclusion-exclusion `(S1 − 3A + 2B)/6`.
+
 ### The FFT crossover
 
 At **10M** values in a bounded range `[-5M, 5M]`:
@@ -134,10 +154,9 @@ in one convolution, no pair scanning. FFT's dream case: small range + impossible
 ### Where FFT fails
 
 1. **Wide value range** — cost is O(U log U); sparse/large ints blow up `U`. Dies when `U log U > n²`.
-2. **Counting** — it decides + gives one witness; it does not cleanly count distinct triples.
-3. **Precision** — double-precision convolution rounds counts; huge counts risk a wrong `llround` (fix: integer NTT).
-4. **Non-additive keys** — needs values → bounded integer index and a *sum* (linear convolution). Strings/floats/similarity → useless.
-5. **Overhead** — power-of-two padding wastes up to 2×; setup constant loses to a trivial loop at small `n`.
+2. **Precision** — double-precision convolution rounds counts; huge counts risk a wrong `llround` (fix: integer NTT). Validated exact up to 64K here.
+3. **Non-additive keys** — needs values → bounded integer index and a *sum* (linear convolution). Strings/floats/similarity → useless.
+4. **Overhead** — power-of-two padding wastes up to 2×; setup constant loses to a trivial loop at small `n`.
 
 ---
 
