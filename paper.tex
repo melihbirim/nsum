@@ -1,0 +1,264 @@
+% 3SUM for engineers — practitioner version, plain language
+% Build: tectonic paper.tex
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{microtype}
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{basicstyle=\ttfamily\small, columns=fullflexible, keepspaces=true,
+        frame=single, framerule=0.3pt, xleftmargin=1em}
+
+\title{Counting Triples That Sum to a Target:\\An Engineer's Field Guide to 3SUM}
+\author{Melih Birim\\\texttt{melihbirim@gmail.com}}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+You have an array of integers and want to count how many triples add up to a
+target, say zero. This is the classic 3SUM problem. We built four working
+solutions in C, benchmarked them on the standard textbook inputs, and this paper
+tells you which one to use and why, in plain language. The short version: sort the
+array and use two pointers; that wins almost every time. But if your values live
+in a limited range (say, sensor readings, prices in cents, pixel values) and you
+have millions of them, there is a trick borrowed from signal processing whose
+cost tracks the value range instead of the input size: on our inputs, about half
+a second whether given one thousand numbers or sixty-four thousand, and 3 seconds
+at ten million. We explain that trick the way one engineer would explain it to another,
+show exactly where it starts winning (around 20{,}000--25{,}000 elements on our
+inputs), and describe how we made sure every number in this paper is real: four
+independent programs must agree with each other and with published reference
+counts, and the whole benchmark re-runs in CI on every release. Code:
+\url{https://github.com/melihbirim/nsum}.
+\end{abstract}
+
+\section{The problem, and why you should care}
+
+Count the ways to pick three different positions $i<j<k$ in an array so that
+$a_i+a_j+a_k$ equals a target $T$. It looks like a toy interview question. It is
+also a real building block: collision detection, finding zero-net groups of
+transactions, and dozens of computational geometry problems secretly reduce to it.
+
+Theory says something discouraging: nobody knows how to solve general 3SUM
+meaningfully faster than $n^2$ steps, and the standing conjecture is that nobody
+ever will~\cite{gajentaan1995}. (The best known result shaves only
+polylogarithmic factors off $n^2$~\cite{gronlund2014}; for an engineer, that is
+quadratic.) So for arbitrary integers, quadratic is the game, and the engineering
+question becomes: \emph{which} quadratic, and is there any way around it for
+\emph{your} data? There is one way around it, and it only needs one property your
+data may already have: a bounded value range.
+
+\section{Four ways to do it}
+
+\paragraph{1. Brute force: three nested loops.}
+Try every triple. $O(n^3)$. On our machine it takes 16 seconds at 8{,}000 elements
+and extrapolates to 17 minutes at 32{,}000 and over two hours at 64{,}000. Useless in production, but priceless
+as ground truth: it is so simple it is almost certainly correct, so we use it to
+check the clever versions on small inputs.
+
+\paragraph{2. Hash map.}
+For each pair, ask a hash table how many earlier elements equal $T - a_i - a_j$.
+Still $O(n^2)$, and it needs no sorting. That is its only advantage. In our
+measurements it is about $3\times$ slower than the next method, because hashing
+jumps around memory while the alternative streams through it. Use it only when
+you genuinely cannot sort (for example, data arriving as a stream you index once).
+
+\paragraph{3. Sort + two pointers: the default.}
+Sort once. For each element $a_k$, sweep two pointers toward each other across the
+elements before it: sum too small, move the left pointer right; too big, move the
+right pointer left; equal, count and move both. Each sweep is linear, so the whole
+thing is $O(n^2)$ but with a tiny constant and perfectly sequential memory access.
+One practical wrinkle: duplicated values. When both pointers sit on runs of equal
+values, multiply the run lengths instead of stepping one at a time; when the whole
+remaining window is a single repeated value appearing $m$ times, add
+$m(m-1)/2$ pairs. That keeps repeated data from degrading the sweep.
+\textbf{This is the method to reach for first.} It won every benchmark below
+$20$K elements and it can list the triples, not just count them.
+
+\paragraph{4. The FFT trick: the escape hatch.}
+The only way we know to beat quadratic, and it works only when values sit in a
+bounded range $U$ (in our inputs, $[-10^6, 10^6]$, so $U \approx 2$ million). Its
+running time depends on $U$, \emph{not on $n$}: about half a second at every size
+from 1K to 64K on our machine. (At 10 million elements the linear work of reading
+input and building the histogram finally shows up, and the run takes about 3
+seconds. Against 36 extrapolated hours for the alternative, we will take it.)
+Section~\ref{sec:fft} explains the trick without assuming you remember any
+signal-processing math. The trick itself is well known, folklore in competitive
+programming and a textbook exercise; our contribution is measuring it against the
+alternatives in production C and spelling out the exact-counting correction.
+
+\paragraph{A detour that failed: SIMD.}
+We first tried to speed up brute force with NEON vector instructions, comparing
+four integers per instruction. It genuinely made the inner loop $4\times$ faster.
+It was still hopeless, because two-pointer's \emph{algorithmic} advantage is a
+factor around $n/6$, which at $n=8$K is over a thousand. We kept the code in the
+repo as a reminder of the rule every performance engineer eventually learns the
+hard way: \textbf{pick the right algorithm first, then vectorize it.} A $4\times$
+constant does not rescue the wrong big-O.
+
+\section{The FFT trick, explained like an engineer}
+\label{sec:fft}
+
+Forget the array order. Build a histogram: \texttt{cnt[v]} = how many times value
+$v$ appears. All the information 3SUM counting needs is in that histogram.
+
+Now the key idea. Suppose you want a table \texttt{pairs[s]} = number of ways to
+pick two values (with repetition, order counted) that add up to $s$. You could
+compute it with two nested loops over the histogram, which is $O(U^2)$, quadratic
+again, just in $U$ instead of $n$. But this exact table is what mathematicians
+call a \emph{convolution} of the histogram with itself, and there is a standard
+fast routine for convolutions: the Fast Fourier Transform. You do not need to
+understand \emph{why} the FFT works to use it, the same way you do not need to
+understand how your compiler allocates registers. The contract is:
+
+\begin{lstlisting}
+FFT(histogram)          // transform: O(U log U)
+square it pointwise     // O(U)
+inverse FFT             // back-transform: O(U log U)
+result = pairs[]        // pair-sum table, all sums at once
+\end{lstlisting}
+
+That is the whole trick: \textbf{the FFT is a fast way to fill in the ``how many
+pairs sum to $s$'' table for every $s$ simultaneously.} With that table, counting
+triples is one more linear pass: for each value $c$ in the histogram, look up
+\texttt{pairs[T - c]} and multiply by \texttt{cnt[c]}.
+
+\paragraph{The correction step.}
+There is a catch, and it is the same catch you hit whenever you count
+combinations with a tool that does not know about ``distinct positions.'' The
+pair table happily counts an element paired \emph{with itself}, and our triple
+loop happily reuses the same position twice. So the raw total, call it $S_1$,
+over-counts. The fix is ordinary double-counting bookkeeping, no advanced math:
+
+\begin{itemize}
+\item Count triples that reuse one position twice: for each value $c$, that needs
+      a partner equal to $T - 2c$; call the total $A$.
+\item Count triples that use one position three times: that is only possible if
+      $T$ is divisible by 3, and equals \texttt{cnt[T/3]}; call it $B$.
+\item Every over-count pattern can happen in a few symmetric ways, and every
+      legitimate triple got counted $6$ times ($3!$ orderings). Putting it
+      together:
+\end{itemize}
+\[
+\text{answer} \;=\; \frac{S_1 - 3A + 2B}{6}.
+\]
+If you have ever de-duplicated a JOIN that matched rows to themselves, you have
+done this kind of correction before. The $A$ and $B$ passes are cheap linear
+loops. Total cost: $O(n)$ to build the histogram plus $O(U \log U)$ for the FFT.
+
+\paragraph{One honest caveat.}
+Our FFT uses \texttt{double} floats and rounds each table entry to the nearest
+integer. Through 64K elements the counts are verified exactly right against the
+integer-arithmetic methods. At 10 million elements the count
+(12{,}499{,}729{,}168{,}317) is beyond independent verification: the quadratic
+methods would need a day and a half to check it. A back-of-envelope error bound
+says the rounding margin is comfortable there, but honesty requires the label
+``unverified.'' If you operate at that scale for real, switch the FFT for an
+integer version (an NTT); the recipe above does not change, only the transform
+underneath.
+
+\section{Measurements: who wins, where}
+
+Standard benchmark inputs from Sedgewick and Wayne's \emph{Algorithms}
+textbook~\cite{sedgewick2011} (the \texttt{ThreeSum} files, values in
+$[-10^6,10^6]$), counting zero-sum triples, single-threaded C at \texttt{-O3} on
+Apple arm64.
+
+\begin{table}[h]
+\centering
+\caption{Seconds to count all zero-sum triples. $*$ = extrapolated; brute force
+is unrunnable past 8K.}
+\begin{tabular}{rrrrr}
+\toprule
+$n$ & brute & hash & two-pointer & FFT\\
+\midrule
+1K  & 0.035        & 0.003  & 0.0013 & 0.45\\
+8K  & 16.2         & 0.23   & 0.083  & 0.48\\
+32K & $\sim$1040$^*$  & 4.3    & 1.4    & 0.49\\
+64K & $\sim$8300$^*$  & 17.4   & 5.5    & 0.45\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Read the FFT column top to bottom: it barely moves. Its cost is pinned to the
+value range, and the range is the same in every file. Meanwhile the two-pointer
+column grows $4\times$ per doubling, exactly as $n^2$ predicts. The lines cross
+between 8K and 32K, around $n \approx 20$--$25$K on this hardware. Past the
+crossing the gap explodes: at 10 million bounded values, two-pointer extrapolates
+to about 36 hours; the FFT counter, actually run, finished in 3.1 seconds.
+
+\paragraph{The decision table.}
+
+\begin{itemize}
+\item Everyday case, need to list the triples, or $n$ under $\sim$20K:
+      \textbf{sort + two pointers.}
+\item Can't sort: \textbf{hash}, and accept roughly $3\times$ slower.
+\item Millions of elements whose values fit a bounded range: \textbf{FFT.}
+\item Huge value range (64-bit hashes, arbitrary integers): FFT is out; its
+      memory and time follow the range. Back to two pointers.
+\end{itemize}
+
+\section{How we made sure these numbers are real}
+
+Benchmarks are easy to get wrong and easier to transcribe wrong, so the
+repository enforces three rules, and we recommend them for any performance
+writeup:
+
+\begin{enumerate}
+\item \textbf{Independent implementations must agree.} All four methods run on
+      the same input; any disagreement prints \texttt{MISMATCH} and fails the
+      run. Four programs written differently agreeing on 16{,}377{,}796 is strong
+      evidence there is no shared bug.
+\item \textbf{Check against numbers we didn't produce.} The textbook publishes
+      the triple counts for its own inputs (70, 528, 4039, 32074, 255181,
+      2052358, 16377796). Ours match, all seven.
+\item \textbf{Let a machine that isn't yours reproduce it.} The release CI runs
+      the full benchmark on a clean runner and pastes the actual output into the
+      release notes. Numbers in this paper were reproduced, not copied.
+\end{enumerate}
+
+Each binary also carries a tiny built-in self-test (\texttt{demo()}) asserting
+known answers on hand-checkable arrays, including the all-equal case
+$[5,5,5]$, target 15, which exercises the $B$ correction.
+
+\section{Takeaways}
+
+\begin{enumerate}
+\item Sort + two pointers is the production default for 3SUM. Simple, fast,
+      lists triples, handles duplicates with the block-counting trick.
+\item Vectorizing the wrong algorithm is wasted effort. Algorithm first,
+      intrinsics second.
+\item The FFT is not just for signals. Treat it as a library routine that fills
+      an entire ``how many pairs sum to $s$'' table in $O(U\log U)$, and a whole
+      class of counting problems drops out of quadratic time, whenever your
+      values live in a bounded range.
+\item Publish benchmarks with their verification harness. Cross-validation,
+      external reference counts, and CI re-execution cost an afternoon and make
+      the numbers trustworthy.
+\end{enumerate}
+
+\begin{thebibliography}{9}
+
+\bibitem{gajentaan1995}
+A.~Gajentaan and M.~H. Overmars.
+\newblock On a class of $O(n^2)$ problems in computational geometry.
+\newblock \emph{Computational Geometry}, 5(3):165--185, 1995.
+
+\bibitem{gronlund2014}
+A.~Gr{\o}nlund and S.~Pettie.
+\newblock Threesomes, degenerates, and love triangles.
+\newblock In \emph{Proc.\ 55th IEEE FOCS}, pages 621--630, 2014.
+
+\bibitem{sedgewick2011}
+R.~Sedgewick and K.~Wayne.
+\newblock \emph{Algorithms}, 4th edition.
+\newblock Addison-Wesley, 2011. \texttt{ThreeSum} benchmark data,
+  \url{https://algs4.cs.princeton.edu}.
+
+\end{thebibliography}
+
+\end{document}

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <time.h>
 #include <assert.h>
 
@@ -28,6 +29,7 @@ static void fft(double complex *a, int n, int invert) {
         for (int i = 0; i < n; i += len) {
             double complex w = 1;
             for (int k = 0; k < len / 2; k++) {
+                if ((k & 31) == 0) w = cexp(I * ang * k);  // refresh twiddle: stops O(len) error accumulation
                 double complex u = a[i + k], v = a[i + k + len / 2] * w;
                 a[i + k] = u + v;
                 a[i + k + len / 2] = u - v;
@@ -59,19 +61,21 @@ long three_sum_count_fft(const int32_t *arr, int n, int64_t T) {
     for (int t = 0; t < m; t++) conv2[t] = llround(creal(p[t]));
 
     int64_t Tt = T - 3 * (int64_t)lo;                 // shifted triple target: s_a+s_b+s_c = Tt
-    long S1 = 0, A = 0, B = 0;
+    __int128 S1 = 0;                                  // ordered triples can reach n^3: overflows int64 past n~2M skewed
+    long A = 0, B = 0;
     for (int ci = 0; ci < U; ci++) {                  // pick third value c, need pair sum = Tt-ci
         if (!cnt[ci]) continue;
         int64_t t = Tt - ci;
-        if (t >= 0 && t < m) S1 += cnt[ci] * conv2[t]; // ordered triples, indices independent
+        if (t >= 0 && t < m) S1 += (__int128)cnt[ci] * conv2[t]; // ordered triples, indices independent
         int64_t two = Tt - 2 * (int64_t)ci;            // A: two indices equal (value ci), third = two
         if (two >= 0 && two < U) A += cnt[ci] * cnt[two];
     }
     if (Tt % 3 == 0) { long v = Tt / 3; if (v >= 0 && v < U) B = cnt[v]; }  // all three equal
 
-    long count = (S1 - 3 * A + 2 * B) / 6;            // ordered-all-distinct / 3!
+    __int128 count = (S1 - 3 * (__int128)A + 2 * B) / 6;  // ordered-all-distinct / 3!
     free(cnt); free(p); free(conv2);
-    return count;
+    if (count > LONG_MAX) { fprintf(stderr, "count overflows int64\n"); return -1; }
+    return (long)count;
 }
 
 static void demo(void) {
@@ -81,6 +85,14 @@ static void demo(void) {
     assert(three_sum_count_fft(b, 3, 15) == 1);
     int32_t c[] = {1, 2, 3};                          // none
     assert(three_sum_count_fft(c, 3, 100) == 0);
+    int32_t d[] = {-5, -3, -2, 0};                    // negative target: -5-3-2
+    assert(three_sum_count_fft(d, 4, -10) == 1);
+    // adversarial skew: n equal values, count = C(n,3). Stresses A/B corrections
+    // and the worst-case conv2 bin (n^2 in one bin) that uniform inputs never hit.
+    enum { NZ = 3000 };
+    int32_t *z = calloc(NZ, sizeof *z);
+    assert(three_sum_count_fft(z, NZ, 0) == (long)NZ * (NZ - 1) * (NZ - 2) / 6);
+    free(z);
     printf("demo ok\n");
 }
 

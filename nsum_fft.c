@@ -27,6 +27,7 @@ static void fft(double complex *a, int n, int invert) {
         for (int i = 0; i < n; i += len) {
             double complex w = 1;
             for (int k = 0; k < len / 2; k++) {
+                if ((k & 31) == 0) w = cexp(I * ang * k);  // refresh twiddle: stops O(len) error accumulation
                 double complex u = a[i + k], v = a[i + k + len / 2] * w;
                 a[i + k] = u + v;
                 a[i + k + len / 2] = u - v;
