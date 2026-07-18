@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.10" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Melih Birim melihbirim@gmail.com" />
+  <title>Counting Triples That Sum to a Target: An Engineer’s Field Guide to 3SUM</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script defer=""
+  src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Counting Triples That Sum to a Target:<br />
+An Engineer’s Field Guide to 3SUM</h1>
+<p class="author">Melih Birim<br />
+<code>melihbirim@gmail.com</code></p>
+<p class="date">July 2026</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>You have an array of integers and want to count how many triples add
+up to a target, say zero. This is the classic 3SUM problem. We built
+four working solutions in C, benchmarked them on the standard textbook
+inputs, and this paper tells you which one to use and why, in plain
+language. The short version: sort the array and use two pointers; that
+wins almost every time. But if your values live in a limited range (say,
+sensor readings, prices in cents, pixel values) and you have millions of
+them, there is a trick borrowed from signal processing whose cost tracks
+the value range instead of the input size: on our inputs, about half a
+second whether given one thousand numbers or sixty-four thousand, and 3
+seconds at ten million. We explain that trick the way one engineer would
+explain it to another, show exactly where it starts winning (around
+20<span>,</span>000–25<span>,</span>000 elements on our inputs), and
+describe how we made sure every number in this paper is real: four
+independent programs must agree with each other and with published
+reference counts, and the whole benchmark re-runs in CI on every
+release. Code: <a href="https://github.com/melihbirim/nsum"
+class="uri">https://github.com/melihbirim/nsum</a>.</p>
+</div>
+</header>
+<h1 id="the-problem-and-why-you-should-care">The problem, and why you
+should care</h1>
+<p>Count the ways to pick three different positions <span
+class="math inline">\(i&lt;j&lt;k\)</span> in an array so that <span
+class="math inline">\(a_i+a_j+a_k\)</span> equals a target <span
+class="math inline">\(T\)</span>. It looks like a toy interview
+question. It is also a real building block: collision detection, finding
+zero-net groups of transactions, and dozens of computational geometry
+problems secretly reduce to it.</p>
+<p>Theory says something discouraging: nobody knows how to solve general
+3SUM meaningfully faster than <span class="math inline">\(n^2\)</span>
+steps, and the standing conjecture is that nobody ever will [1]. (The
+best known result shaves only polylogarithmic factors off <span
+class="math inline">\(n^2\)</span> [2]; for an engineer, that is
+quadratic.) So for arbitrary integers, quadratic is the game, and the
+engineering question becomes: <em>which</em> quadratic, and is there any
+way around it for <em>your</em> data? There is one way around it, and it
+only needs one property your data may already have: a bounded value
+range.</p>
+<h1 id="four-ways-to-do-it">Four ways to do it</h1>
+<h4 id="brute-force-three-nested-loops.">1. Brute force: three nested
+loops.</h4>
+<p>Try every triple. <span class="math inline">\(O(n^3)\)</span>. On our
+machine it takes 16 seconds at 8<span>,</span>000 elements and
+extrapolates to 17 minutes at 32<span>,</span>000 and over two hours at
+64<span>,</span>000. Useless in production, but priceless as ground
+truth: it is so simple it is almost certainly correct, so we use it to
+check the clever versions on small inputs.</p>
+<h4 id="hash-map.">2. Hash map.</h4>
+<p>For each pair, ask a hash table how many earlier elements equal <span
+class="math inline">\(T - a_i - a_j\)</span>. Still <span
+class="math inline">\(O(n^2)\)</span>, and it needs no sorting. That is
+its only advantage. In our measurements it is about <span
+class="math inline">\(3\times\)</span> slower than the next method,
+because hashing jumps around memory while the alternative streams
+through it. Use it only when you genuinely cannot sort (for example,
+data arriving as a stream you index once).</p>
+<h4 id="sort-two-pointers-the-default.">3. Sort + two pointers: the
+default.</h4>
+<p>Sort once. For each element <span class="math inline">\(a_k\)</span>,
+sweep two pointers toward each other across the elements before it: sum
+too small, move the left pointer right; too big, move the right pointer
+left; equal, count and move both. Each sweep is linear, so the whole
+thing is <span class="math inline">\(O(n^2)\)</span> but with a tiny
+constant and perfectly sequential memory access. One practical wrinkle:
+duplicated values. When both pointers sit on runs of equal values,
+multiply the run lengths instead of stepping one at a time; when the
+whole remaining window is a single repeated value appearing <span
+class="math inline">\(m\)</span> times, add <span
+class="math inline">\(m(m-1)/2\)</span> pairs. That keeps repeated data
+from degrading the sweep. <strong>This is the method to reach for
+first.</strong> It won every benchmark below <span
+class="math inline">\(20\)</span>K elements and it can list the triples,
+not just count them.</p>
+<h4 id="the-fft-trick-the-escape-hatch.">4. The FFT trick: the escape
+hatch.</h4>
+<p>The only way we know to beat quadratic, and it works only when values
+sit in a bounded range <span class="math inline">\(U\)</span> (in our
+inputs, <span class="math inline">\([-10^6, 10^6]\)</span>, so <span
+class="math inline">\(U \approx 2\)</span> million). Its running time
+depends on <span class="math inline">\(U\)</span>, <em>not on <span
+class="math inline">\(n\)</span></em>: about half a second at every size
+from 1K to 64K on our machine. (At 10 million elements the linear work
+of reading input and building the histogram finally shows up, and the
+run takes about 3 seconds. Against 36 extrapolated hours for the
+alternative, we will take it.) Section <a href="#sec:fft"
+data-reference-type="ref" data-reference="sec:fft">3</a> explains the
+trick without assuming you remember any signal-processing math. The
+trick itself is well known, folklore in competitive programming and a
+textbook exercise; our contribution is measuring it against the
+alternatives in production C and spelling out the exact-counting
+correction.</p>
+<h4 id="a-detour-that-failed-simd.">A detour that failed: SIMD.</h4>
+<p>We first tried to speed up brute force with NEON vector instructions,
+comparing four integers per instruction. It genuinely made the inner
+loop <span class="math inline">\(4\times\)</span> faster. It was still
+hopeless, because two-pointer’s <em>algorithmic</em> advantage is a
+factor around <span class="math inline">\(n/6\)</span>, which at <span
+class="math inline">\(n=8\)</span>K is over a thousand. We kept the code
+in the repo as a reminder of the rule every performance engineer
+eventually learns the hard way: <strong>pick the right algorithm first,
+then vectorize it.</strong> A <span
+class="math inline">\(4\times\)</span> constant does not rescue the
+wrong big-O.</p>
+<h1 id="sec:fft">The FFT trick, explained like an engineer</h1>
+<p>Forget the array order. Build a histogram: <code>cnt[v]</code> = how
+many times value <span class="math inline">\(v\)</span> appears. All the
+information 3SUM counting needs is in that histogram.</p>
+<p>Now the key idea. Suppose you want a table <code>pairs[s]</code> =
+number of ways to pick two values (with repetition, order counted) that
+add up to <span class="math inline">\(s\)</span>. You could compute it
+with two nested loops over the histogram, which is <span
+class="math inline">\(O(U^2)\)</span>, quadratic again, just in <span
+class="math inline">\(U\)</span> instead of <span
+class="math inline">\(n\)</span>. But this exact table is what
+mathematicians call a <em>convolution</em> of the histogram with itself,
+and there is a standard fast routine for convolutions: the Fast Fourier
+Transform. You do not need to understand <em>why</em> the FFT works to
+use it, the same way you do not need to understand how your compiler
+allocates registers. The contract is:</p>
+<pre><code>FFT(histogram)          // transform: O(U log U)
+square it pointwise     // O(U)
+inverse FFT             // back-transform: O(U log U)
+result = pairs[]        // pair-sum table, all sums at once</code></pre>
+<p>That is the whole trick: <strong>the FFT is a fast way to fill in the
+“how many pairs sum to <span class="math inline">\(s\)</span>” table for
+every <span class="math inline">\(s\)</span> simultaneously.</strong>
+With that table, counting triples is one more linear pass: for each
+value <span class="math inline">\(c\)</span> in the histogram, look up
+<code>pairs[T - c]</code> and multiply by <code>cnt[c]</code>.</p>
+<h4 id="the-correction-step.">The correction step.</h4>
+<p>There is a catch, and it is the same catch you hit whenever you count
+combinations with a tool that does not know about “distinct positions.”
+The pair table happily counts an element paired <em>with itself</em>,
+and our triple loop happily reuses the same position twice. So the raw
+total, call it <span class="math inline">\(S_1\)</span>, over-counts.
+The fix is ordinary double-counting bookkeeping, no advanced math:</p>
+<ul>
+<li><p>Count triples that reuse one position twice: for each value <span
+class="math inline">\(c\)</span>, that needs a partner equal to <span
+class="math inline">\(T - 2c\)</span>; call the total <span
+class="math inline">\(A\)</span>.</p></li>
+<li><p>Count triples that use one position three times: that is only
+possible if <span class="math inline">\(T\)</span> is divisible by 3,
+and equals <code>cnt[T/3]</code>; call it <span
+class="math inline">\(B\)</span>.</p></li>
+<li><p>Every over-count pattern can happen in a few symmetric ways, and
+every legitimate triple got counted <span
+class="math inline">\(6\)</span> times (<span
+class="math inline">\(3!\)</span> orderings). Putting it
+together:</p></li>
+</ul>
+<p><span class="math display">\[\text{answer} \;=\; \frac{S_1 - 3A +
+2B}{6}.\]</span> If you have ever de-duplicated a JOIN that matched rows
+to themselves, you have done this kind of correction before. The <span
+class="math inline">\(A\)</span> and <span
+class="math inline">\(B\)</span> passes are cheap linear loops. Total
+cost: <span class="math inline">\(O(n)\)</span> to build the histogram
+plus <span class="math inline">\(O(U \log U)\)</span> for the FFT.</p>
+<h4 id="one-honest-caveat.">One honest caveat.</h4>
+<p>Our FFT uses <code>double</code> floats and rounds each table entry
+to the nearest integer. Through 64K elements the counts are verified
+exactly right against the integer-arithmetic methods. At 10 million
+elements the count
+(12<span>,</span>499<span>,</span>729<span>,</span>168<span>,</span>317)
+is beyond independent verification: the quadratic methods would need a
+day and a half to check it. A back-of-envelope error bound says the
+rounding margin is comfortable there, but honesty requires the label
+“unverified.” If you operate at that scale for real, switch the FFT for
+an integer version (an NTT); the recipe above does not change, only the
+transform underneath.</p>
+<h1 id="measurements-who-wins-where">Measurements: who wins, where</h1>
+<p>Standard benchmark inputs from Sedgewick and Wayne’s
+<em>Algorithms</em> textbook [3] (the <code>ThreeSum</code> files,
+values in <span class="math inline">\([-10^6,10^6]\)</span>), counting
+zero-sum triples, single-threaded C at <code>-O3</code> on Apple
+arm64.</p>
+<table>
+<caption>Seconds to count all zero-sum triples. <span
+class="math inline">\(*\)</span> = extrapolated; brute force is
+unrunnable past 8K.</caption>
+<thead>
+<tr>
+<th style="text-align: right;"><span
+class="math inline">\(n\)</span></th>
+<th style="text-align: right;">brute</th>
+<th style="text-align: right;">hash</th>
+<th style="text-align: right;">two-pointer</th>
+<th style="text-align: right;">FFT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1K</td>
+<td style="text-align: right;">0.035</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">0.0013</td>
+<td style="text-align: right;">0.45</td>
+</tr>
+<tr>
+<td style="text-align: right;">8K</td>
+<td style="text-align: right;">16.2</td>
+<td style="text-align: right;">0.23</td>
+<td style="text-align: right;">0.083</td>
+<td style="text-align: right;">0.48</td>
+</tr>
+<tr>
+<td style="text-align: right;">32K</td>
+<td style="text-align: right;"><span
+class="math inline">\(\sim\)</span>1040<span
+class="math inline">\(^*\)</span></td>
+<td style="text-align: right;">4.3</td>
+<td style="text-align: right;">1.4</td>
+<td style="text-align: right;">0.49</td>
+</tr>
+<tr>
+<td style="text-align: right;">64K</td>
+<td style="text-align: right;"><span
+class="math inline">\(\sim\)</span>8300<span
+class="math inline">\(^*\)</span></td>
+<td style="text-align: right;">17.4</td>
+<td style="text-align: right;">5.5</td>
+<td style="text-align: right;">0.45</td>
+</tr>
+</tbody>
+</table>
+<p>Read the FFT column top to bottom: it barely moves. Its cost is
+pinned to the value range, and the range is the same in every file.
+Meanwhile the two-pointer column grows <span
+class="math inline">\(4\times\)</span> per doubling, exactly as <span
+class="math inline">\(n^2\)</span> predicts. The lines cross between 8K
+and 32K, around <span class="math inline">\(n \approx 20\)</span>–<span
+class="math inline">\(25\)</span>K on this hardware. Past the crossing
+the gap explodes: at 10 million bounded values, two-pointer extrapolates
+to about 36 hours; the FFT counter, actually run, finished in 3.1
+seconds.</p>
+<h4 id="the-decision-table.">The decision table.</h4>
+<ul>
+<li><p>Everyday case, need to list the triples, or <span
+class="math inline">\(n\)</span> under <span
+class="math inline">\(\sim\)</span>20K: <strong>sort + two
+pointers.</strong></p></li>
+<li><p>Can’t sort: <strong>hash</strong>, and accept roughly <span
+class="math inline">\(3\times\)</span> slower.</p></li>
+<li><p>Millions of elements whose values fit a bounded range:
+<strong>FFT.</strong></p></li>
+<li><p>Huge value range (64-bit hashes, arbitrary integers): FFT is out;
+its memory and time follow the range. Back to two pointers.</p></li>
+</ul>
+<h1 id="how-we-made-sure-these-numbers-are-real">How we made sure these
+numbers are real</h1>
+<p>Benchmarks are easy to get wrong and easier to transcribe wrong, so
+the repository enforces three rules, and we recommend them for any
+performance writeup:</p>
+<ol>
+<li><p><strong>Independent implementations must agree.</strong> All four
+methods run on the same input; any disagreement prints
+<code>MISMATCH</code> and fails the run. Four programs written
+differently agreeing on 16<span>,</span>377<span>,</span>796 is strong
+evidence there is no shared bug.</p></li>
+<li><p><strong>Check against numbers we didn’t produce.</strong> The
+textbook publishes the triple counts for its own inputs (70, 528, 4039,
+32074, 255181, 2052358, 16377796). Ours match, all seven.</p></li>
+<li><p><strong>Let a machine that isn’t yours reproduce it.</strong> The
+release CI runs the full benchmark on a clean runner and pastes the
+actual output into the release notes. Numbers in this paper were
+reproduced, not copied.</p></li>
+</ol>
+<p>Each binary also carries a tiny built-in self-test
+(<code>demo()</code>) asserting known answers on hand-checkable arrays,
+including the all-equal case <span
+class="math inline">\([5,5,5]\)</span>, target 15, which exercises the
+<span class="math inline">\(B\)</span> correction.</p>
+<h1 id="takeaways">Takeaways</h1>
+<ol>
+<li><p>Sort + two pointers is the production default for 3SUM. Simple,
+fast, lists triples, handles duplicates with the block-counting
+trick.</p></li>
+<li><p>Vectorizing the wrong algorithm is wasted effort. Algorithm
+first, intrinsics second.</p></li>
+<li><p>The FFT is not just for signals. Treat it as a library routine
+that fills an entire “how many pairs sum to <span
+class="math inline">\(s\)</span>” table in <span
+class="math inline">\(O(U\log U)\)</span>, and a whole class of counting
+problems drops out of quadratic time, whenever your values live in a
+bounded range.</p></li>
+<li><p>Publish benchmarks with their verification harness.
+Cross-validation, external reference counts, and CI re-execution cost an
+afternoon and make the numbers trustworthy.</p></li>
+</ol>
+<h1 class="unnumbered" id="references">References</h1>
+<dl>
+<dt><span>[1]</span></dt>
+<dd>
+<p>A. Gajentaan and M. H. Overmars. On a class of <span
+class="math inline">\(O(n^2)\)</span> problems in computational
+geometry. <em>Computational Geometry</em>, 5(3):165–185, 1995.</p>
+</dd>
+<dt><span>[2]</span></dt>
+<dd>
+<p>A. Gr<span>ø</span>nlund and S. Pettie. Threesomes, degenerates, and
+love triangles. In <em>Proc. 55th IEEE FOCS</em>, pages 621–630,
+2014.</p>
+</dd>
+<dt><span>[3]</span></dt>
+<dd>
+<p>R. Sedgewick and K. Wayne. <em>Algorithms</em>, 4th edition.
+Addison-Wesley, 2011. <code>ThreeSum</code> benchmark data, <a
+href="https://algs4.cs.princeton.edu"
+class="uri">https://algs4.cs.princeton.edu</a>.</p>
+</dd>
+</dl>
+</body>
+</html>
